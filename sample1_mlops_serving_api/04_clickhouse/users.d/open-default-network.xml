@@ -1,0 +1,19 @@
+<!--
+  公式イメージは default ユーザを localhost 限定 (::1 / 127.0.0.1) にする
+  default-user.xml を自動生成する。そのままだと別コンテナの Spark から接続できず
+  "Authentication failed" になるため、ローカルサンプル用に全ネットワークを許可する。
+  (本番では専用ユーザ + パスワード + ネットワーク制限を行うこと)
+
+  ファイル名は default-user.xml より後ろに読まれるようにして networks を上書きする。
+  replace="replace" で localhost 限定の networks を丸ごと置き換える。
+-->
+<clickhouse>
+  <users>
+    <default>
+      <password></password>
+      <networks replace="replace">
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>

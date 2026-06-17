@@ -1,0 +1,183 @@
+# =============================================================================
+# sample1_mlops_serving_api - end-to-end streaming ML pipeline
+#
+#   Client -> Ingest API -> PostgreSQL(OLTP) --WAL--> Debezium/Kafka Connect
+#          -> Kafka -> ClickHouse Sink -> ClickHouse(DWH)
+#          -> Spark(前処理) -> Python Trainer(学習) -> Model -> Serving API
+#
+# Streaming services start with `docker compose up -d`.
+# Batch services (spark / trainer) run on demand via the `batch` profile.
+# =============================================================================
+
+name: sample1_mlops_serving_api
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. Ingest API : Client が叩く受け口。受け取ったイベントを OLTP に書き込む
+  # --------------------------------------------------------------------------
+  ingest-api:
+    build: ./01_api_ingest
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/oltp
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 2. PostgreSQL (OLTP) : wal_level=logical で論理レプリケーション(CDC)を有効化
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: oltp
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./02_postgres/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d oltp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --------------------------------------------------------------------------
+  # 3. Kafka + Zookeeper : CDC イベントの流れるバックボーン
+  # --------------------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # kafka:29092 = コンテナ間 / localhost:9092 = ホストから
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # --------------------------------------------------------------------------
+  # 4. Debezium / Kafka Connect : PostgreSQL の WAL を読んで Kafka へ流す(CDC)
+  # --------------------------------------------------------------------------
+  connect:
+    image: quay.io/debezium/connect:2.7
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: cdc-connect
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  # --------------------------------------------------------------------------
+  # 5+6. ClickHouse (Sink + DWH)
+  #   Kafka Engine テーブルが「ClickHouse Sink」、Materialized View 経由で
+  #   MergeTree の DWH テーブルへ取り込む
+  # --------------------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8123:8123"   # HTTP
+      - "9000:9000"   # native
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - ./04_clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./04_clickhouse/users.d/open-default-network.xml:/etc/clickhouse-server/users.d/open-default-network.xml:ro
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --------------------------------------------------------------------------
+  # 7. Spark : DWH から学習用データを読んで前処理し parquet を書き出す (batch)
+  # --------------------------------------------------------------------------
+  spark:
+    build: ./05_spark
+    profiles: ["batch"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/dwh
+    volumes:
+      - features:/data/features
+
+  # --------------------------------------------------------------------------
+  # 8+9. Python Trainer : 前処理済み parquet からモデルを学習し /models に保存 (batch)
+  # --------------------------------------------------------------------------
+  trainer:
+    build: ./06_trainer
+    profiles: ["batch"]
+    volumes:
+      - features:/data/features
+      - models:/models
+
+  # --------------------------------------------------------------------------
+  # 10. Serving API : 保存されたモデルをロードして予測を返す
+  # --------------------------------------------------------------------------
+  serving-api:
+    build: ./07_api_serving
+    environment:
+      MODEL_PATH: /models/model.joblib
+    ports:
+      - "8001:8001"
+    volumes:
+      - models:/models:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  chdata:
+  features:
+  models:
