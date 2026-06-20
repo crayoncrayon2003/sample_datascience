@@ -1,0 +1,146 @@
+{
+  "uid": "roadmesh-overview",
+  "title": "Road Link Congestion Overview",
+  "tags": ["sample4", "roadlink", "traffic"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "稼働車両数(直近30秒)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT uniqExact(vehicle_id) AS vehicles FROM dwh.vehicle_positions WHERE created_at > now() - INTERVAL 30 SECOND" } ]
+    },
+    {
+      "id": 2, "type": "stat", "title": "位置イベント数",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT count() AS positions FROM dwh.vehicle_positions" } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "渋滞リンク数(直近5分・観測平均速度<12・n>=10)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 6, "x": 10, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT count() AS congested_links FROM (SELECT link_id, avg(speed_kmh) AS s, count() AS n FROM dwh.vehicle_positions WHERE created_at > now() - INTERVAL 5 MINUTE GROUP BY link_id HAVING n >= 10 AND s < 12)" } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "最新モデルの精度",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "percentunit", "decimals": 3 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT accuracy FROM dwh.model_runs ORDER BY trained_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 5, "type": "geomap", "title": "地図:道路リンクを矢印で表示(向き=進行方向・色=直近5分のローリング平均速度 緑=空き/黄=やや/赤=渋滞・観測n>=10のみ・位置はリンク中点で固定)、小●=直近30秒の車両1台",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 16, "w": 14, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 2, "color": "red" } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "view": { "id": "coords", "lat": 35.02, "lon": 135.86, "zoom": 12 },
+        "basemap": { "type": "default", "name": "Basemap" },
+        "controls": { "showZoom": true, "mouseWheelZoom": true, "showAttribution": true },
+        "tooltip": { "mode": "details" },
+        "layers": [
+          {
+            "type": "geojson",
+            "name": "境界",
+            "config": { "src": "public/maps/sample/boundary.geojson", "style": { "color": { "fixed": "dark-blue" }, "opacity": 0.12 } }
+          },
+          {
+            "type": "geojson",
+            "name": "道路リンク",
+            "config": { "src": "public/maps/sample/road_links.geojson", "style": { "color": { "fixed": "gray" }, "opacity": 0.22 } }
+          },
+          {
+            "type": "markers",
+            "name": "リンク渋滞(矢印=進行方向・色=渋滞・位置は固定)",
+            "filterData": { "id": "byRefId", "options": "B" },
+            "location": { "mode": "auto" },
+            "config": {
+              "showLegend": true,
+              "style": {
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/triangle.svg" },
+                "symbolAlign": { "horizontal": "center", "vertical": "center" },
+                "size": { "fixed": 11 },
+                "color": { "field": "congestion" },
+                "rotation": { "mode": "field", "field": "bearing", "fixed": 0, "min": 0, "max": 360 },
+                "opacity": 0.85
+              }
+            }
+          },
+          {
+            "type": "markers",
+            "name": "車両(1点=1台)",
+            "filterData": { "id": "byRefId", "options": "A" },
+            "location": { "mode": "auto" },
+            "config": { "showLegend": false, "style": { "size": { "fixed": 3 }, "color": { "fixed": "dark-blue" }, "opacity": 0.9 } }
+          }
+        ]
+      },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT vehicle_id, argMax(latitude, created_at) AS latitude, argMax(longitude, created_at) AS longitude, argMax(speed_kmh, created_at) AS speed_kmh, argMax(link_id, created_at) AS link_id FROM dwh.vehicle_positions WHERE created_at > now() - INTERVAL 30 SECOND GROUP BY vehicle_id" },
+        { "refId": "B", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT g.mid_lat AS latitude, g.mid_lon AS longitude, g.bearing AS bearing, c.congestion AS congestion, c.n AS n, c.avg_speed AS avg_speed, c.link_id AS link_id FROM (SELECT link_id, multiIf(avg(speed_kmh) < 12, 2, avg(speed_kmh) < 24, 1, 0) AS congestion, count() AS n, round(avg(speed_kmh), 2) AS avg_speed, max(created_at) AS last_seen FROM dwh.vehicle_positions WHERE created_at > now() - INTERVAL 5 MINUTE GROUP BY link_id HAVING n >= 10 AND last_seen > now() - INTERVAL 60 SECOND) AS c INNER JOIN dwh.link_geo AS g USING (link_id)" }
+      ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "平均速度 / 分(道路種別)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 7, "w": 10, "x": 14, "y": 4 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "velocitykmh" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "timeseries", "rawSql": "SELECT toStartOfMinute(created_at) AS time, road_type, avg(speed_kmh) AS avg_speed FROM dwh.vehicle_positions WHERE $__timeFilter(created_at) GROUP BY time, road_type ORDER BY time" } ],
+      "transformations": [ { "id": "partitionByValues", "options": { "fields": ["road_type"], "keepFields": false } } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "平均渋滞レベル / 分(予測, 0〜2)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 11 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 }, "unit": "short", "min": 0, "max": 2 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "hidden" }, "tooltip": { "mode": "single" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "timeseries", "rawSql": "SELECT toStartOfMinute(event_time) AS time, avg(pred_congestion) AS avg_congestion FROM dwh.congestion_pred WHERE $__timeFilter(event_time) GROUP BY time ORDER BY time" } ]
+    },
+    {
+      "id": 8, "type": "table", "title": "道路種別ごとの渋滞(予測 vs 実測の平均レベル)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT road_type, count() AS n, round(avg(pred_congestion), 2) AS pred_avg, round(avg(actual_congestion), 2) AS actual_avg FROM dwh.congestion_pred GROUP BY road_type ORDER BY n DESC" } ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "再学習ごとの精度推移",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "pointSize": 6, "showPoints": "always" }, "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "hidden" }, "tooltip": { "mode": "single" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "timeseries", "rawSql": "SELECT trained_at AS time, accuracy FROM dwh.model_runs ORDER BY trained_at" } ]
+    },
+    {
+      "id": 10, "type": "table", "title": "直近の車両 + 予測/実測渋滞",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "queryType": "table", "rawSql": "SELECT event_time, vehicle_id, road_type, link_id, sim_hour, pred_congestion, actual_congestion, round(pred_proba, 3) AS prob FROM dwh.congestion_pred ORDER BY scored_at DESC LIMIT 100" } ]
+    }
+  ]
+}

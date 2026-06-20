@@ -1,6 +1,0 @@
-__pycache__/
-*.pyc
-models/*.joblib
-models/*.json
-data/
-.venv/
