@@ -1,0 +1,2 @@
+dagster==1.9.1
+dagster-webserver==1.9.1

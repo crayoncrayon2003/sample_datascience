@@ -1,0 +1,237 @@
+{
+  "uid": "fraud-overview",
+  "title": "Fraud Streaming Overview",
+  "tags": ["sample2", "fraud", "streaming"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "総取引数 (transactions)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT count() AS total FROM dwh.transactions"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "スコア済み (predictions)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT count() AS scored FROM dwh.predictions"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "不正と予測 (pred_label=1)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT countIf(pred_label = 1) AS fraud FROM dwh.predictions"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "最新モデルの ROC-AUC",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "none", "decimals": 3 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT roc_auc FROM dwh.model_runs ORDER BY trained_at DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "流入スループット / 分(ペルソナ別)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } }, "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfMinute(created_at) AS time, source, count() AS events FROM dwh.transactions WHERE $__timeFilter(created_at) GROUP BY time, source ORDER BY time"
+        }
+      ],
+      "transformations": [
+        { "id": "partitionByValues", "options": { "fields": ["source"], "keepFields": false } }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "予測 fraud 率 / 分",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfMinute(t.created_at) AS time, avg(p.pred_label) AS fraud_rate FROM dwh.predictions AS p INNER JOIN dwh.transactions AS t ON p.tx_uuid = t.tx_uuid WHERE $__timeFilter(t.created_at) GROUP BY time ORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "geomap",
+      "title": "取引マップ(色 = fraud 確率)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 11, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+      "options": {
+        "view": { "id": "zero", "lat": 25, "lon": 10, "zoom": 1.5 },
+        "basemap": { "type": "default", "name": "Basemap" },
+        "controls": { "showZoom": true, "mouseWheelZoom": true, "showAttribution": true },
+        "tooltip": { "mode": "details" },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "transactions",
+            "location": { "mode": "auto" },
+            "config": {
+              "showLegend": true,
+              "style": {
+                "size": { "fixed": 4 },
+                "color": { "field": "fraud_probability" },
+                "opacity": 0.6,
+                "symbol": { "fixed": "img/icons/marker/circle.svg" }
+              }
+            }
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT t.latitude AS latitude, t.longitude AS longitude, p.fraud_probability AS fraud_probability FROM dwh.predictions AS p INNER JOIN dwh.transactions AS t ON p.tx_uuid = t.tx_uuid ORDER BY p.scored_at DESC LIMIT 2000"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "histogram",
+      "title": "fraud 確率の分布",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 70 } }, "overrides": [] },
+      "options": { "bucketCount": 30, "legend": { "displayMode": "hidden" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT fraud_probability FROM dwh.predictions ORDER BY scored_at DESC LIMIT 50000"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "国別リスク(平均 fraud 確率)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT t.country AS country, count() AS n, round(avg(p.fraud_probability), 3) AS avg_prob, sum(p.pred_label) AS predicted_fraud FROM dwh.predictions AS p INNER JOIN dwh.transactions AS t ON p.tx_uuid = t.tx_uuid GROUP BY country ORDER BY avg_prob DESC"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "再学習ごとの ROC-AUC 推移",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "pointSize": 6, "showPoints": "always" }, "unit": "none", "min": 0.5, "max": 1 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "rawSql": "SELECT trained_at AS time, roc_auc FROM dwh.model_runs ORDER BY trained_at"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "直近の取引 + スコア",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "rawSql": "SELECT t.created_at AS created_at, t.source AS source, t.country AS country, t.device AS device, t.merchant_category AS category, round(t.amount, 2) AS amount, round(p.fraud_probability, 3) AS fraud_prob, p.pred_label AS pred FROM dwh.transactions AS t INNER JOIN dwh.predictions AS p ON t.tx_uuid = p.tx_uuid ORDER BY t.created_at DESC LIMIT 100"
+        }
+      ]
+    }
+  ]
+}
