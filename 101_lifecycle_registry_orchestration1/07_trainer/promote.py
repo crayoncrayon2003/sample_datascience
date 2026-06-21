@@ -4,8 +4,7 @@
 challenger が勝てば(または champion がまだ居なければ)`@champion` を challenger に
 付け替える。負けたら据え置き(= 性能が下がるモデルは本番に出さない)。
 
-ロールバックは「過去の version に champion alias を戻す」だけで完了する。
-これが 004 までの『joblib を上書き』には無かった、version 管理の効果。
+ロールバックは「過去の version に champion alias を戻す」だけで完了する(version 管理の効果)。
 
 評価指標は各 version に紐づく run の `roc_auc` メトリクスを参照する(再計算しない)。
 """

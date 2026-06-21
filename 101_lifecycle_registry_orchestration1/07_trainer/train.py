@@ -1,7 +1,6 @@
 """Python Trainer(MLflow Tracking + Model Registry 版).
 
-004 までは学習結果を `model.joblib` + `metadata.json` としてボリュームに dump していた。
-本サンプルでは:
+本サンプルは、学習結果を「ファイルに dump」せず、次のように MLflow で版管理する:
 
   1. 学習した sklearn Pipeline を **MLflow Tracking** に run として記録(params / metrics)
   2. その run のモデルを Model Registry に `fraud` という名前で **version 登録**

@@ -1,7 +1,7 @@
 """Dagster による再学習パイプラインの定義(software-defined assets)。
 
-004 までの再学習は `make train` の手動実行だった。本サンプルでは Dagster が
-DAG 化し、スケジュール(既定 10 分ごと)で回す。資産(asset)の依存関係が
+再学習(前処理 → 学習 → 昇格)を Dagster が DAG 化し、スケジュール(既定 10 分ごと)で回す。
+手動で 1 周だけ回したいときは `make train` でも同じ3ステップを実行できる。資産(asset)の依存関係が
 
     features ─▶ challenger_model ─▶ champion_model
 

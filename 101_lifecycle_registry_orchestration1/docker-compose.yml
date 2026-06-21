@@ -1,16 +1,14 @@
 # =============================================================================
 # 101_lifecycle_registry_orchestration1 - モデルライフサイクル(MLflow + Dagster)
 #
-#   003 のストリーミング基盤(Kafka 直読 → Spark Structured Streaming → ClickHouse
-#   → Grafana)はそのまま流用し、モデルの「管理・配信・再学習」を入れ替えた:
+#   ストリーミング基盤(Kafka 直読 → Spark Structured Streaming → ClickHouse → Grafana)
+#   の上に、モデルの「管理・配信・再学習」を載せた構成:
 #
 #     - MLflow Tracking + Model Registry … 実験記録と version 管理(alias 方式)
 #     - Trainer  … 学習 → run 記録 → version 登録 → @challenger 付与
 #     - Promoter … champion と ROC-AUC 比較 → 勝てば @champion 昇格(ロールバック可)
 #     - Dagster  … 上記を DAG 化しスケジュール実行(features → challenger → champion)
 #     - Scorer   … models:/fraud@champion を Registry から解決し無停止リロード
-#
-#   004 までの「joblib をボリュームに dump + mtime 監視」を置き換えた版。
 #
 # 起動の流れ:
 #   make up        … 基盤 + mlflow + dagster + stream-scorer + Grafana を起動

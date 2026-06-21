@@ -8,8 +8,7 @@
 生データの取り込み(dwh.transactions)は従来どおり ClickHouse の Kafka Engine が担当。
 このジョブは推論だけを担う(同じトピックを別コンシューマグループで購読する)。
 
-学習(Trainer)はバッチのまま。004 までと違い、モデルは **MLflow Model Registry の
-alias `champion`** から解決する(`models:/fraud@champion`)。foreachBatch のたびに現在の
+学習(Trainer)はバッチ。モデルは **MLflow Model Registry の alias `champion`** から解決する(`models:/fraud@champion`)。foreachBatch のたびに現在の
 champion version を確認し、変わっていれば無停止で再ロードする(旧版の mtime 監視の正統進化)。
 """
 from __future__ import annotations
