@@ -12,6 +12,17 @@ __pycache__/
 # --- OS / エディタ ---
 .DS_Store
 *.swp
+.idea/
+.vscode/
+
+# --- ログ / 秘密情報(誤コミット防止）---
+*.log
+.env
+.env.*
+
+# --- Python テスト/ビルドのキャッシュ ---
+.pytest_cache/
+*.egg-info/
 
 # --- 学習成果物(host に出力した場合。通常は Docker volume 管理なので出ない)---
 **/models/*.joblib
@@ -22,3 +33,12 @@ __pycache__/
 004_mlops_roadmesh_streaming/data/road/*.graphml
 004_mlops_roadmesh_streaming/data/geojson/
 004_mlops_roadmesh_streaming/08_grafana/geojson/*.geojson
+
+# --- 101/102: オーケストレータ(Dagster/Airflow)が /project に作りうるランタイム生成物 ---
+#     Dagster dev はカレント直下に tmp<ランダム> を作ることがある(working_dir 是正済みだが保険)。
+#     Airflow は AIRFLOW_HOME=/opt/airflow(コンテナ内)に出るので通常 host には出ない。
+10*_lifecycle_registry_orchestration*/tmp*/
+**/standalone_admin_password.txt
+**/airflow.db
+**/airflow.cfg
+**/webserver_config.py
