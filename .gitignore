@@ -19,6 +19,6 @@ __pycache__/
 
 # --- sample4: make data / prep が生成・DL する成果物(大きい・再生成可能)---
 #     ディレクトリ自体はマウント用に .gitkeep で残す。
-sample4_mlops_roadmesh_streaming/data/road/*.graphml
-sample4_mlops_roadmesh_streaming/data/geojson/
-sample4_mlops_roadmesh_streaming/08_grafana/geojson/*.geojson
+004_mlops_roadmesh_streaming/data/road/*.graphml
+004_mlops_roadmesh_streaming/data/geojson/
+004_mlops_roadmesh_streaming/08_grafana/geojson/*.geojson
