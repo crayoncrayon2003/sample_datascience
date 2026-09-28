@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# ClickHouse 公式プラグイン(grafana-clickhouse-datasource)経由で DWH に接続。
+# default ユーザ・パスワード無し(open-default-network.xml で別コンテナから接続可)。
+datasources:
+  - name: ClickHouse
+    uid: clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      username: default
+      defaultDatabase: dwh
+    secureJsonData:
+      password: ""

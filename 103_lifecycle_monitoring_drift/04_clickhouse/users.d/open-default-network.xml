@@ -1,0 +1,15 @@
+<!--
+  公式イメージは default ユーザを localhost 限定にするため、別コンテナ(Spark /
+  Scorer / Grafana)から接続できるよう全ネットワークを許可する(ローカルサンプル用)。
+  本番では専用ユーザ + パスワード + ネットワーク制限を行うこと。
+-->
+<clickhouse>
+  <users>
+    <default>
+      <password></password>
+      <networks replace="replace">
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>

@@ -1,0 +1,116 @@
+{
+  "uid": "drift-overview",
+  "title": "Drift & Data Quality Monitoring",
+  "tags": ["monitoring", "drift"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "最新ドリフト割合 (drift share)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 0.5 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT drift_share FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 2, "type": "stat", "title": "全体ドリフト判定 (0=なし / 1=あり)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short",
+        "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT dataset_drift FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "ドリフト特徴量数 / 全体",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT concat(toString(n_drifted), ' / ', toString(n_features)) AS drifted FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "予測 fraud 率(直近)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT pred_fraud_rate FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 5, "type": "stat", "title": "欠損率 (data quality)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit",
+        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.01 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT missing_share FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 6, "type": "stat", "title": "評価ウィンドウ件数",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "table",
+        "rawSql": "SELECT current_rows FROM dwh.drift_metrics ORDER BY computed_at DESC LIMIT 1" } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "ドリフト割合の推移 (drift share / 分)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "timeseries",
+        "rawSql": "SELECT computed_at AS time, drift_share FROM dwh.drift_metrics WHERE $__timeFilter(computed_at) ORDER BY time" } ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "予測 fraud 率 vs 学習時の基準",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "timeseries",
+        "rawSql": "SELECT computed_at AS time, pred_fraud_rate, ref_fraud_rate FROM dwh.drift_metrics WHERE $__timeFilter(computed_at) ORDER BY time" } ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "特徴量ごとのドリフトスコア",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 5 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "timeseries",
+        "rawSql": "SELECT computed_at AS time, feature, drift_score FROM dwh.drift_by_feature WHERE $__timeFilter(computed_at) ORDER BY time" } ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "平均 fraud 確率の推移",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "editorType": "sql", "queryType": "timeseries",
+        "rawSql": "SELECT computed_at AS time, pred_mean_proba FROM dwh.drift_metrics WHERE $__timeFilter(computed_at) ORDER BY time" } ]
+    }
+  ]
+}

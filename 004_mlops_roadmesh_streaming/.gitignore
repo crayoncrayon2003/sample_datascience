@@ -1,0 +1,4 @@
+# make data / prep で生成する、現在存在する再生成可能なデータ
+/data/road/road_drive.graphml
+/08_grafana/geojson/boundary.geojson
+/08_grafana/geojson/road_links.geojson
